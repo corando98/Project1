@@ -1,3 +1,6 @@
+Diego Garcia
+SID 20387443
+
 SMP1: Simple Shell
 ==================
 
