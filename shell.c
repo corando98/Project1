@@ -125,15 +125,20 @@ int main(int argc, char **argv)
 		} else if (!strcmp(exec_argv[0], "cd") && exec_argc > 1) {
 		/* Running 'cd' changes the Shell's working directory. */
 			/* Alternative: try chdir inside a forked child: if(fork() == 0) { */
+			//if(fork() == 0) {
 			if (chdir(exec_argv[1]))
 				/* Error: change directory failed */
-				fprintf(stderr, "cd: failed to chdir %s\n", exec_argv[1]);	
+				fprintf(stderr, "cd: failed to chdir %s\n", exec_argv[1]);
+				//exit(EXIT_SUCCESS);}
 			/* End alternative: exit(EXIT_SUCCESS);} */
 
 		} else {
 		/* Execute Commands */
 			/* Try replacing 'fork()' with '0'.  What happens? */
 			pid_from_fork = fork();
+			//Running using exec call
+			//pid_from_fork = 0;
+
 
 			if (pid_from_fork < 0) {
 				/* Error: fork() failed.  Unlikely, but possible (e.g. OS *
@@ -142,7 +147,7 @@ int main(int argc, char **argv)
 				continue;
 			}
 			if (pid_from_fork == 0) {
-				
+
 				// TO-DO P5.6
 
 				return imthechild(exec_argv[0], &exec_argv[0]);
