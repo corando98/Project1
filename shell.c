@@ -1,28 +1,34 @@
 /* SMP1: Simple Shell */
 
-/* LIBRARY SECTION */
-#include <ctype.h>              /* Character types                       */
-#include <stdio.h>              /* Standard buffered input/output        */
-#include <stdlib.h>             /* Standard library functions            */
-#include <string.h>             /* String operations                     */
-#include <sys/types.h>          /* Data types                            */
-#include <sys/wait.h>           /* Declarations for waiting              */
-#include <unistd.h>             /* Standard symbolic constants and types */
+//Diego Garcia
+//20387443
 
-#include "smp1_tests.h"         /* Built-in test system                  */
+/* LIBRARY SECTION */
+#include <ctype.h>	   /* Character types                       */
+#include <stdio.h>	   /* Standard buffered input/output        */
+#include <stdlib.h>	   /* Standard library functions            */
+#include <string.h>	   /* String operations                     */
+#include <sys/types.h> /* Data types                            */
+#include <sys/wait.h>  /* Declarations for waiting              */
+#include <unistd.h>	   /* Standard symbolic constants and types */
+
+#include "smp1_tests.h" /* Built-in test system                  */
 
 /* DEFINE SECTION */
-#define SHELL_BUFFER_SIZE 256   /* Size of the Shell input buffer        */
-#define SHELL_MAX_ARGS 8        /* Maximum number of arguments parsed    */
+#define SHELL_BUFFER_SIZE 256 /* Size of the Shell input buffer        */
+#define SHELL_MAX_ARGS 8	  /* Maximum number of arguments parsed    */
 
 /* VARIABLE SECTION */
-enum { STATE_SPACE, STATE_NON_SPACE };	/* Parser states */
-
+enum
+{
+	STATE_SPACE,
+	STATE_NON_SPACE
+}; /* Parser states */
 
 int imthechild(const char *path_to_exec, char *const args[])
 {
 	// TO-DO P5.1
-	return execv(path_to_exec, args) ? -1 : 0;
+	return execvp(path_to_exec, args) ? -1 : 0;
 }
 
 void imtheparent(pid_t child_pid, int run_in_background)
@@ -31,25 +37,27 @@ void imtheparent(pid_t child_pid, int run_in_background)
 
 	/* fork returned a positive pid so we are the parent */
 	fprintf(stderr,
-	        "  Parent says 'child process has been forked with pid=%d'\n",
-	        child_pid);
-	if (run_in_background) {
+			"  Parent says 'child process has been forked with pid=%d'\n",
+			child_pid);
+	if (run_in_background)
+	{
 		fprintf(stderr,
-		        "  Parent says 'run_in_background=1 ... so we're not waiting for the child'\n");
+				"  Parent says 'run_in_background=1 ... so we're not waiting for the child'\n");
 		return;
 	}
-	// TO-DO P5.4
-	wait(&child_return_val);
+
+	waitpid(child_pid, &child_return_val, 0);
 	/* Use the WEXITSTATUS to extract the status code from the return value */
 	child_error_code = WEXITSTATUS(child_return_val);
 	fprintf(stderr,
-	        "  Parent says 'wait() returned so the child with pid=%d is finished.'\n",
-	        child_pid);
-	if (child_error_code != 0) {
+			"  Parent says 'wait() returned so the child with pid=%d is finished.'\n",
+			child_pid);
+	if (child_error_code != 0)
+	{
 		/* Error: Child process failed. Most likely a failed exec */
 		fprintf(stderr,
-		        "  Parent says 'Child process %d failed with code %d'\n",
-		        child_pid, child_error_code);
+				"  Parent says 'Child process %d failed with code %d'\n",
+				child_pid, child_error_code);
 	}
 }
 
@@ -62,21 +70,28 @@ int main(int argc, char **argv)
 	char buffer[SHELL_BUFFER_SIZE];
 	/* exec_argv: Arguments passed to exec call including NULL terminator. */
 	char *exec_argv[SHELL_MAX_ARGS + 1];
-	// TO-DO new variables for P5.2, P5.3, P5.6
+
+	//Variables for P5.2, P5.3, P5.6
+
+	int cmdcount = 1;						   //P5.2
+	char history_buffer[9][SHELL_BUFFER_SIZE]; //P5.3
+	int sub_shell_depth = 0;				   //P5.6
 
 	/* Entrypoint for the testrunner program */
-	if (argc > 1 && !strcmp(argv[1], "-test")) {
+	if (argc > 1 && !strcmp(argv[1], "-test"))
+	{
 		return run_smp1_tests(argc - 1, argv + 1);
 	}
 
 	/* Allow the Shell prompt to display the pid of this process */
 	shell_pid = getpid();
 
-	while (1) {
-	/* The Shell runs in an infinite loop, processing input. */
+	while (1)
+	{
+		/* The Shell runs in an infinite loop, processing input. */
 
-		// TO-DO P5.2
-		fprintf(stdout, "Shell(pid=%d)> ", shell_pid);
+		//P5.2 (Added command counter)
+		fprintf(stdout, "Shell(pid=%d)%d> ", shell_pid, cmdcount);
 		fflush(stdout);
 
 		/* Read a line of input. */
@@ -86,20 +101,43 @@ int main(int argc, char **argv)
 		run_in_background = n_read > 2 && buffer[n_read - 2] == '&';
 		buffer[n_read - run_in_background - 1] = '\n';
 
-		// TO-DO P5.3
+		//P5.3 Check execution of previous command
+		if (buffer[0] == '!')
+		{
+			int lastcmd = buffer[1] - '0';
+			if ((1 <= lastcmd) && (lastcmd <= 9) && (lastcmd < cmdcount))
+				strncpy(buffer, history_buffer[lastcmd - 1], SHELL_BUFFER_SIZE);
+			else
+			{
+				fprintf(stderr, "Not valid\n");
+				continue;
+			}
+		}
+
+		//P5.3 Save last cmd and count
+		if (buffer[0] != '\n')
+		{
+			if (cmdcount <= 9)
+				strncpy(history_buffer[cmdcount - 1], buffer, SHELL_BUFFER_SIZE);
+			cmdcount++;
+		}
 
 		/* Parse the arguments: the first argument is the file or command *
 		 * we want to run.                                                */
 
 		parser_state = STATE_SPACE;
 		for (exec_argc = 0, i = 0;
-		     (buffer[i] != '\n') && (exec_argc < SHELL_MAX_ARGS); i++) {
+			 (buffer[i] != '\n') && (exec_argc < SHELL_MAX_ARGS); i++)
+		{
 
-			if (!isspace(buffer[i])) {
+			if (!isspace(buffer[i]))
+			{
 				if (parser_state == STATE_SPACE)
 					exec_argv[exec_argc++] = &buffer[i];
 				parser_state = STATE_NON_SPACE;
-			} else {
+			}
+			else
+			{
 				buffer[i] = '\0';
 				parser_state = STATE_SPACE;
 			}
@@ -108,8 +146,7 @@ int main(int argc, char **argv)
 		/* run_in_background is 1 if the input line's last character *
 		 * is an ampersand (indicating background execution).        */
 
-
-		buffer[i] = '\0';	/* Terminate input, overwriting the '&' if it exists */
+		buffer[i] = '\0'; /* Terminate input, overwriting the '&' if it exists */
 
 		/* If no command was given (empty line) the Shell just prints the prompt again */
 		if (!exec_argc)
@@ -118,46 +155,61 @@ int main(int argc, char **argv)
 		exec_argv[exec_argc] = NULL;
 
 		/* If Shell runs 'exit' it exits the program. */
-		if (!strcmp(exec_argv[0], "exit")) {
+		if (!strcmp(exec_argv[0], "exit"))
+		{
 			printf("Exiting process %d\n", shell_pid);
-			return EXIT_SUCCESS;	/* End Shell program */
-
-		} else if (!strcmp(exec_argv[0], "cd") && exec_argc > 1) {
-		/* Running 'cd' changes the Shell's working directory. */
+			return EXIT_SUCCESS; /* End Shell program */
+		}
+		else if (!strcmp(exec_argv[0], "cd") && exec_argc > 1)
+		{
+			/* Running 'cd' changes the Shell's working directory. */
 			/* Alternative: try chdir inside a forked child: if(fork() == 0) { */
-			//if(fork() == 0) {
 			if (chdir(exec_argv[1]))
 				/* Error: change directory failed */
 				fprintf(stderr, "cd: failed to chdir %s\n", exec_argv[1]);
-				//exit(EXIT_SUCCESS);}
 			/* End alternative: exit(EXIT_SUCCESS);} */
-
-		} else {
-		/* Execute Commands */
+		}
+		else
+		{
+			/* Execute Commands */
 			/* Try replacing 'fork()' with '0'.  What happens? */
 			pid_from_fork = fork();
-			//Running using exec call
-			//pid_from_fork = 0;
 
-
-			if (pid_from_fork < 0) {
+			if (pid_from_fork < 0)
+			{
 				/* Error: fork() failed.  Unlikely, but possible (e.g. OS *
 				 * kernel runs out of memory or process descriptors).     */
 				fprintf(stderr, "fork failed\n");
 				continue;
 			}
-			if (pid_from_fork == 0) {
-
-				// TO-DO P5.6
-
-				return imthechild(exec_argv[0], &exec_argv[0]);
+			if (pid_from_fork == 0)
+			{
+				//P5.6 Subshell
+				if (!strcmp(exec_argv[0], "sub"))
+				{
+					//Reintalize subshell
+					cmdcount = 1;
+					shell_pid = getpid();
+					sub_shell_depth++;
+					if (sub_shell_depth >= 3)
+					{
+						fprintf(stderr, "Too deep!\n");
+						return 0;
+					}
+				}
+				else
+				{
+					return imthechild(exec_argv[0], &exec_argv[0]);
+				}
 				/* Exit from main. */
-			} else {
+			}
+			else
+			{
 				imtheparent(pid_from_fork, run_in_background);
 				/* Parent will continue around the loop. */
 			}
 		} /* end if */
-	} /* end while loop */
+	}	  /* end while loop */
 
 	return EXIT_SUCCESS;
 } /* end main() */
